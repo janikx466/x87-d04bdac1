@@ -6,11 +6,15 @@ import logoSrc from "@/assets/logo.png";
 
 interface QRCodeCardProps {
   vaultId: string;
+  reminderText?: string;
 }
 
-const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId }) => {
+const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId, reminderText }) => {
   const qrRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
+  const qrReady = useRef(false);
+
+  const reminder = reminderText || "Scan this to unlock your private vault photos";
 
   useEffect(() => {
     if (!qrRef.current) return;
@@ -40,8 +44,9 @@ const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId }) => {
     });
 
     qr.append(qrRef.current);
+    qrReady.current = true;
 
-    // Fire confetti
+    // Fire confetti immediately
     setTimeout(() => {
       const end = Date.now() + 1000;
       (function frame() {
@@ -50,20 +55,32 @@ const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId }) => {
         if (Date.now() < end) requestAnimationFrame(frame);
       })();
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.4 }, colors: ["#ffffff", "#22c55e", "#ffd700"] });
-    }, 400);
+    }, 200);
   }, [vaultId]);
 
   const downloadQR = async () => {
     if (!exportRef.current) return;
-    const canvas = await html2canvas(exportRef.current, {
-      backgroundColor: "#ffffff",
-      scale: 3,
-      useCORS: true,
-    });
-    const link = document.createElement("a");
-    link.download = "SecretGPV-Vault-QR.png";
-    link.href = canvas.toDataURL();
-    link.click();
+    // Wait a tick for canvas to render
+    await new Promise((r) => setTimeout(r, 100));
+    try {
+      const canvas = await html2canvas(exportRef.current, {
+        backgroundColor: "#ffffff",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement("a");
+      link.download = `SecretGPV-Vault-${vaultId}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch {
+      // Fallback: try again
+      const canvas = await html2canvas(exportRef.current, { backgroundColor: "#ffffff", scale: 2, useCORS: true });
+      const link = document.createElement("a");
+      link.download = `SecretGPV-Vault-${vaultId}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
   };
 
   return (
@@ -78,20 +95,20 @@ const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId }) => {
           animation: "cardPop 0.5s ease-out forwards",
         }}
       >
-        <div id="qrExportBox" ref={exportRef}>
+        <div id="qrExportBox" ref={exportRef} style={{ background: "#ffffff", padding: "20px", borderRadius: "20px" }}>
           <div
             ref={qrRef}
-            className="mb-4 bg-white p-3 rounded-[20px] inline-block"
-            style={{ boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}
+            className="mb-4 inline-block"
+            style={{ borderRadius: "20px" }}
           />
-          <div className="mb-4 px-2">
-            <span className="text-sm text-white/80 italic font-light block max-w-[280px] mx-auto leading-relaxed">
-              "Scan this to unlock your private vault photos"
+          <div className="mb-3 px-2">
+            <span style={{ fontSize: "14px", color: "#555", fontStyle: "italic", fontWeight: 300, display: "block", maxWidth: "280px", margin: "0 auto", lineHeight: 1.4 }}>
+              "{reminder}"
             </span>
           </div>
-          <div className="flex justify-center items-center text-[10px] font-bold tracking-[2px] uppercase">
-            <span className="text-gray-400 mr-1.5">POWERED BY</span>
-            <span className="text-green-500">SECRETGPV VAULT</span>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", textTransform: "uppercase" as const }}>
+            <span style={{ color: "#a3a3a3", marginRight: "6px" }}>POWERED BY</span>
+            <span style={{ color: "#22c55e" }}>SECRETGPV VAULT</span>
           </div>
         </div>
 

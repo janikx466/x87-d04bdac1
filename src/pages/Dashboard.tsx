@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { redeemCode } from "@/lib/worker";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import { toast } from "sonner";
 import { Copy, Plus, Gift, LogOut, CreditCard, BarChart3, QrCode, Shield } from "lucide-react";
@@ -10,8 +9,6 @@ import logoSrc from "@/assets/logo.png";
 const Dashboard: React.FC = () => {
   const { user, userData, loading, logout } = useAuth();
   const navigate = useNavigate();
-  const [redeemInput, setRedeemInput] = useState("");
-  const [redeeming, setRedeeming] = useState(false);
 
   if (loading) return <OrbitalLoader />;
   if (!userData) return <OrbitalLoader text="Loading profile..." />;
@@ -21,20 +18,6 @@ const Dashboard: React.FC = () => {
   const copyInvite = () => {
     navigator.clipboard.writeText(inviteLink);
     toast.success("Invite link copied!");
-  };
-
-  const handleRedeem = async () => {
-    if (!redeemInput.trim()) return toast.error("Enter a redeem code");
-    setRedeeming(true);
-    try {
-      const res = await redeemCode(redeemInput.trim(), userData.uid);
-      toast.success(`Redeemed! +${res.addedCredits} credits (${res.plan})`);
-      setRedeemInput("");
-    } catch (err: any) {
-      toast.error(err.message || "Redeem failed");
-    } finally {
-      setRedeeming(false);
-    }
   };
 
   return (
@@ -54,7 +37,6 @@ const Dashboard: React.FC = () => {
       </nav>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Welcome */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold">Welcome, {userData.displayName || "User"}!</h1>
           <p className="text-white/50 text-sm mt-1">{userData.planName} Plan</p>
@@ -77,20 +59,14 @@ const Dashboard: React.FC = () => {
 
         {/* Actions */}
         <div className="grid md:grid-cols-2 gap-4 mb-8">
-          <button
-            onClick={() => navigate("/create-vault")}
-            className="flex items-center gap-3 p-5 rounded-2xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 transition text-left"
-          >
+          <button onClick={() => navigate("/create-vault")} className="flex items-center gap-3 p-5 rounded-2xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 transition text-left">
             <Plus className="w-6 h-6 text-green-500" />
             <div>
               <p className="font-semibold">Create Vault</p>
               <p className="text-xs text-white/50">Upload photos & generate QR (1 credit)</p>
             </div>
           </button>
-          <button
-            onClick={() => navigate("/my-vaults")}
-            className="flex items-center gap-3 p-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-left"
-          >
+          <button onClick={() => navigate("/my-vaults")} className="flex items-center gap-3 p-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-left">
             <Shield className="w-6 h-6 text-green-500" />
             <div>
               <p className="font-semibold">My Vaults</p>
@@ -103,37 +79,12 @@ const Dashboard: React.FC = () => {
         <div className="p-5 rounded-2xl bg-white/5 border border-white/10 mb-8">
           <h3 className="font-semibold mb-3 flex items-center gap-2"><Gift className="w-5 h-5 text-green-500" /> Referral Link</h3>
           <div className="flex gap-2">
-            <input
-              readOnly
-              value={inviteLink}
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white/70 outline-none"
-            />
+            <input readOnly value={inviteLink} className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white/70 outline-none" />
             <button onClick={copyInvite} className="px-4 py-2 rounded-xl bg-green-500/20 text-green-400 hover:bg-green-500/30 transition">
               <Copy className="w-4 h-4" />
             </button>
           </div>
           <p className="text-xs text-white/40 mt-2">Code: {userData.inviteCode}</p>
-        </div>
-
-        {/* Redeem */}
-        <div className="p-5 rounded-2xl bg-white/5 border border-white/10 mb-8">
-          <h3 className="font-semibold mb-3">Redeem Code</h3>
-          <div className="flex gap-2">
-            <input
-              value={redeemInput}
-              onChange={(e) => setRedeemInput(e.target.value)}
-              placeholder="Enter code..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none placeholder:text-white/30"
-            />
-            <button
-              onClick={handleRedeem}
-              disabled={redeeming}
-              className="px-5 py-2 rounded-xl font-semibold text-white transition disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}
-            >
-              {redeeming ? "..." : "Redeem"}
-            </button>
-          </div>
         </div>
 
         {/* Upgrade */}
