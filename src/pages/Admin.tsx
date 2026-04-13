@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import { toast } from "sonner";
-import { Users, Shield, BarChart3, Clock } from "lucide-react";
+import { Users, Shield, BarChart3, Clock, Megaphone } from "lucide-react";
 
 interface RedeemCodeData {
   id: string;
@@ -38,7 +38,7 @@ interface VaultEntry {
 const Admin: React.FC = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"stats" | "codes" | "users">("stats");
+  const [tab, setTab] = useState<"stats" | "codes" | "users" | "announce">("stats");
   const [codes, setCodes] = useState<RedeemCodeData[]>([]);
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [vaults, setVaults] = useState<VaultEntry[]>([]);
@@ -49,13 +49,18 @@ const Admin: React.FC = () => {
   const [newLimit, setNewLimit] = useState(1);
   const [creating, setCreating] = useState(false);
 
+  // Announcement
+  const [annEnabled, setAnnEnabled] = useState(false);
+  const [annText, setAnnText] = useState("");
+  const [annUrl, setAnnUrl] = useState("");
+  const [annSaving, setAnnSaving] = useState(false);
+
   useEffect(() => {
     if (!userData?.isAdmin) {
       navigate("/dashboard");
       return;
     }
 
-    // Real-time listeners
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       setUsers(snap.docs.map((d) => ({ uid: d.id, ...d.data() } as UserEntry)));
     });
@@ -65,6 +70,16 @@ const Admin: React.FC = () => {
 
     getDocs(collection(db, "redeem_codes")).then((snap) => {
       setCodes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RedeemCodeData)));
+    });
+
+    // Load announcement
+    getDoc(doc(db, "settings", "announcement")).then((snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setAnnEnabled(d.enabled || false);
+        setAnnText(d.text || "");
+        setAnnUrl(d.url || "");
+      }
     });
 
     setLoading(false);
@@ -102,11 +117,24 @@ const Admin: React.FC = () => {
     setCreating(false);
   };
 
+  const saveAnnouncement = async () => {
+    setAnnSaving(true);
+    try {
+      await setDoc(doc(db, "settings", "announcement"), {
+        enabled: annEnabled,
+        text: annText,
+        url: annUrl || null,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success("Announcement updated!");
+    } catch { toast.error("Failed to save"); }
+    setAnnSaving(false);
+  };
+
   if (loading) return <OrbitalLoader />;
 
-  // Stats
   const totalUsers = users.length;
-  const freeUsers = users.filter((u) => u.planName === "Free Trial" || u.planName === "No Trial").length;
+  const freeUsers = users.filter((u) => u.planName === "Free Trial" || u.planName === "No Trial" || u.planName === "Free").length;
   const paidUsers = totalUsers - freeUsers;
   const totalVaults = vaults.length;
   const now = Date.now();
@@ -120,12 +148,11 @@ const Admin: React.FC = () => {
       <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Admin Panel</h1>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          {(["stats", "codes", "users"] as const).map((t) => (
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {(["stats", "codes", "users", "announce"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition ${tab === t ? "bg-green-500 text-white" : "bg-white/5 text-white/60"}`}>
-              {t === "stats" ? "Stats" : t === "codes" ? "Redeem Codes" : "Users"}
+              {t === "stats" ? "Stats" : t === "codes" ? "Redeem Codes" : t === "users" ? "Users" : "Announcement"}
             </button>
           ))}
         </div>
@@ -156,6 +183,7 @@ const Admin: React.FC = () => {
                 <select value={newPlan} onChange={(e) => setNewPlan(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none text-white">
                   <option value="Pro">Pro (500)</option>
                   <option value="Premium">Premium (1200)</option>
+                  <option value="Elite">Elite (3500)</option>
                 </select>
                 <input type="number" value={newLimit} onChange={(e) => setNewLimit(Number(e.target.value))} min={1} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none" />
                 <button onClick={createCode} disabled={creating} className="px-4 py-2 rounded-xl font-semibold text-white" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>Create</button>
@@ -197,7 +225,14 @@ const Admin: React.FC = () => {
                     <tr key={u.uid} className="border-b border-white/5">
                       <td className="py-3 px-2 text-white/70">{u.displayName || "-"}</td>
                       <td className="py-3 px-2 text-white/70">{u.email}</td>
-                      <td className="py-3 px-2"><span className={`text-xs px-2 py-0.5 rounded-full ${u.planName === "Free Trial" || u.planName === "No Trial" ? "bg-white/10 text-white/50" : "bg-green-500/20 text-green-400"}`}>{u.planName}</span></td>
+                      <td className="py-3 px-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          u.planName === "Free Trial" || u.planName === "No Trial" || u.planName === "Free"
+                            ? "bg-white/10 text-white/50"
+                            : u.planName === "Elite" ? "bg-yellow-500/20 text-yellow-400"
+                            : "bg-green-500/20 text-green-400"
+                        }`}>{u.planName}</span>
+                      </td>
                       <td className="py-3 px-2">{u.credits}</td>
                       <td className="py-3 px-2 font-mono text-xs text-white/40">{u.inviteCode}</td>
                       <td className="py-3 px-2 text-xs text-white/40">{joined ? joined.toLocaleDateString() : "-"}</td>
@@ -206,6 +241,27 @@ const Admin: React.FC = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {tab === "announce" && (
+          <div className="p-5 rounded-2xl bg-white/5 border border-white/10 max-w-lg">
+            <h3 className="font-semibold mb-4 flex items-center gap-2"><Megaphone className="w-5 h-5 text-green-500" /> Global Announcement</h3>
+            <div className="flex items-center gap-3 mb-4 bg-white/5 p-3 rounded-xl">
+              <input type="checkbox" checked={annEnabled} onChange={(e) => setAnnEnabled(e.target.checked)} className="accent-green-500 w-4 h-4" />
+              <label className="text-sm text-white/70">Enable announcement</label>
+            </div>
+            <div className="mb-3">
+              <label className="text-xs text-white/50 mb-1 block">Message Text</label>
+              <textarea value={annText} onChange={(e) => setAnnText(e.target.value)} placeholder="Announcement message..." rows={3} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none resize-none" />
+            </div>
+            <div className="mb-4">
+              <label className="text-xs text-white/50 mb-1 block">Link URL (optional)</label>
+              <input type="url" value={annUrl} onChange={(e) => setAnnUrl(e.target.value)} placeholder="https://..." className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none" />
+            </div>
+            <button onClick={saveAnnouncement} disabled={annSaving} className="px-6 py-2 rounded-xl font-semibold text-white" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
+              {annSaving ? "Saving..." : "Save Announcement"}
+            </button>
           </div>
         )}
       </div>

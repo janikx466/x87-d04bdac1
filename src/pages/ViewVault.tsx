@@ -19,7 +19,6 @@ const ViewVault: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-  // Fullscreen viewer
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
   const [scale, setScale] = useState(1);
@@ -29,11 +28,9 @@ const ViewVault: React.FC = () => {
   const lastTouchDist = useRef(0);
   const pinInputRef = useRef<HTMLInputElement>(null);
 
-  // Multi-select download
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
-  // Auto-focus numeric keypad on mount
   useEffect(() => {
     if (!unlocked && !verifying && !statusMessage && pinInputRef.current) {
       setTimeout(() => pinInputRef.current?.focus(), 300);
@@ -51,6 +48,11 @@ const ViewVault: React.FC = () => {
         return;
       }
 
+      if (res.deleted) {
+        setStatusMessage("Vault was Deleted");
+        return;
+      }
+
       setVaultData({
         images: res.images || [],
         downloadAllowed: res.downloadAllowed !== false,
@@ -58,7 +60,7 @@ const ViewVault: React.FC = () => {
       setUnlocked(true);
     } catch (err: any) {
       const msg = err.message || "Verification failed";
-      if (msg.includes("Self Destruct") || msg.includes("Expired") || msg.includes("disabled") || msg.includes("stopped")) {
+      if (msg.includes("Self Destruct") || msg.includes("Expired") || msg.includes("disabled") || msg.includes("stopped") || msg.includes("Deleted")) {
         setStatusMessage(msg);
       } else {
         toast.error(msg);
@@ -68,12 +70,10 @@ const ViewVault: React.FC = () => {
     }
   };
 
-  // Prevent right-click on images
   const preventContext = (e: React.MouseEvent) => {
     if (!vaultData?.downloadAllowed) e.preventDefault();
   };
 
-  // Fullscreen viewer navigation
   const openViewer = (idx: number) => {
     setViewerIndex(idx);
     setScale(1);
@@ -101,7 +101,6 @@ const ViewVault: React.FC = () => {
     setTranslate({ x: 0, y: 0 });
   };
 
-  // Pinch to zoom
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -123,7 +122,6 @@ const ViewVault: React.FC = () => {
     }
   }, []);
 
-  // Mouse drag when zoomed
   const handleMouseDown = (e: React.MouseEvent) => {
     if (scale > 1) {
       setDragging(true);
@@ -137,7 +135,6 @@ const ViewVault: React.FC = () => {
   };
   const handleMouseUp = () => setDragging(false);
 
-  // Swipe
   const swipeStart = useRef(0);
   const handleSwipeStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1 && scale <= 1) swipeStart.current = e.touches[0].clientX;
@@ -149,7 +146,6 @@ const ViewVault: React.FC = () => {
     swipeStart.current = 0;
   };
 
-  // Download helpers
   const downloadImage = async (url: string, name: string) => {
     try {
       const resp = await fetch(url, { mode: "cors" });
@@ -190,7 +186,6 @@ const ViewVault: React.FC = () => {
     });
   };
 
-  // Status message screen (expired, self-destructed, stopped)
   if (statusMessage) {
     return (
       <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4">
@@ -206,7 +201,6 @@ const ViewVault: React.FC = () => {
 
   if (verifying) return <OrbitalLoader text="Verifying PIN..." />;
 
-  // Unlocked gallery view
   if (unlocked && vaultData) {
     const canDownload = vaultData.downloadAllowed;
 
@@ -219,7 +213,6 @@ const ViewVault: React.FC = () => {
           <h1 className="text-2xl font-bold mb-2 text-center">🔓 Vault Unlocked</h1>
           <p className="text-white/40 text-sm text-center mb-6">{vaultData.images.length} photos</p>
 
-          {/* Download controls */}
           {canDownload && vaultData.images.length > 0 && (
             <div className="flex flex-wrap gap-2 justify-center mb-6">
               <button onClick={downloadAll} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500/20 text-green-400 text-sm hover:bg-green-500/30 transition">
@@ -229,17 +222,16 @@ const ViewVault: React.FC = () => {
                 onClick={() => { setSelectMode(!selectMode); setSelected(new Set()); }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white/70 text-sm hover:bg-white/20 transition"
               >
-                <CheckSquare className="w-4 h-4" /> {selectMode ? "Cancel Select" : "Select & Download"}
+                <CheckSquare className="w-4 h-4" /> {selectMode ? "Cancel" : "Select"}
               </button>
               {selectMode && selected.size > 0 && (
                 <button onClick={downloadSelected} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 text-sm hover:bg-blue-500/30 transition">
-                  <Download className="w-4 h-4" /> Download {selected.size} Selected
+                  <Download className="w-4 h-4" /> Download {selected.size}
                 </button>
               )}
             </div>
           )}
 
-          {/* Image grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {vaultData.images.map((src, i) => (
               <div key={i} className="relative group cursor-pointer" onClick={() => selectMode ? toggleSelect(i) : openViewer(i)}>
@@ -250,26 +242,21 @@ const ViewVault: React.FC = () => {
                   crossOrigin="anonymous"
                   onContextMenu={preventContext}
                   draggable={false}
-                  style={!canDownload ? { WebkitUserSelect: "none", userSelect: "none", pointerEvents: "auto" } : {}}
+                  style={!canDownload ? { WebkitUserSelect: "none", userSelect: "none" } : {}}
                 />
                 {selectMode && (
                   <div className="absolute top-2 right-2">
                     {selected.has(i) ? <CheckSquare className="w-6 h-6 text-green-500" /> : <Square className="w-6 h-6 text-white/50" />}
                   </div>
                 )}
-                {!canDownload && (
-                  <div className="absolute inset-0 rounded-2xl" style={{ WebkitTouchCallout: "none" }} />
-                )}
+                {!canDownload && <div className="absolute inset-0 rounded-2xl" style={{ WebkitTouchCallout: "none" }} />}
               </div>
             ))}
           </div>
 
-          {vaultData.images.length === 0 && (
-            <p className="text-center text-white/50 mt-8">No photos found in this vault.</p>
-          )}
+          {vaultData.images.length === 0 && <p className="text-center text-white/50 mt-8">No photos found.</p>}
         </div>
 
-        {/* Fullscreen Viewer */}
         {viewerOpen && (
           <div
             className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
@@ -282,15 +269,9 @@ const ViewVault: React.FC = () => {
             onMouseLeave={handleMouseUp}
             onContextMenu={canDownload ? undefined : (e) => e.preventDefault()}
           >
-            <button onClick={closeViewer} className="absolute top-4 right-4 z-50 text-white/70 hover:text-white">
-              <X className="w-8 h-8" />
-            </button>
-            <button onClick={prevImage} className="absolute left-2 z-50 text-white/50 hover:text-white p-2">
-              <ChevronLeft className="w-8 h-8" />
-            </button>
-            <button onClick={nextImage} className="absolute right-2 z-50 text-white/50 hover:text-white p-2">
-              <ChevronRight className="w-8 h-8" />
-            </button>
+            <button onClick={closeViewer} className="absolute top-4 right-4 z-50 text-white/70 hover:text-white"><X className="w-8 h-8" /></button>
+            <button onClick={prevImage} className="absolute left-2 z-50 text-white/50 hover:text-white p-2"><ChevronLeft className="w-8 h-8" /></button>
+            <button onClick={nextImage} className="absolute right-2 z-50 text-white/50 hover:text-white p-2"><ChevronRight className="w-8 h-8" /></button>
 
             <img
               src={vaultData.images[viewerIndex]}
@@ -311,16 +292,14 @@ const ViewVault: React.FC = () => {
               </button>
             )}
 
-            <div className="absolute bottom-6 left-6 text-white/40 text-xs">
-              {viewerIndex + 1} / {vaultData.images.length}
-            </div>
+            <div className="absolute bottom-6 left-6 text-white/40 text-xs">{viewerIndex + 1} / {vaultData.images.length}</div>
           </div>
         )}
       </div>
     );
   }
 
-  // PIN entry screen
+  // PIN entry
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center px-4">
       <div
@@ -334,8 +313,9 @@ const ViewVault: React.FC = () => {
       >
         <img src={logoSrc} alt="SecretGPV" className="w-14 h-14 mx-auto mb-3" />
         <Lock className="w-10 h-10 text-green-500 mx-auto mb-3" />
-        <h1 className="text-xl font-bold mb-2">Private Vault</h1>
-        <p className="text-white/50 text-sm mb-6">Enter PIN to unlock photos</p>
+        <h1 className="text-xl font-bold mb-1">Private Vault</h1>
+        <p className="text-white/50 text-sm mb-2">Someone sent you a private vault… it may disappear after you view it 🔒</p>
+        <p className="text-white/40 text-xs mb-6">Enter PIN to unlock photos</p>
         <input
           ref={pinInputRef}
           type="number"
@@ -349,11 +329,7 @@ const ViewVault: React.FC = () => {
           onKeyDown={(e) => e.key === "Enter" && handleVerify()}
           autoFocus
         />
-        <button
-          onClick={handleVerify}
-          className="w-full py-3 rounded-xl font-bold text-white transition"
-          style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}
-        >
+        <button onClick={handleVerify} className="w-full py-3 rounded-xl font-bold text-white transition" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
           Unlock Vault
         </button>
       </div>
