@@ -68,4 +68,26 @@ export async function uploadToR2(file: File, fileName: string) {
     console.error("Upload Error:", err);
     throw new Error("Upload failed");
   }
-        }
+}
+
+export async function createMessage(data: {
+  messageId: string;
+  message: string;
+  pin: string;
+  viewLimit: number;
+  selfDestruct: boolean;
+  expiry: string | null;
+  ownerId: string;
+}) {
+  return workerFetch("/create-message", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function openMessage(messageId: string, pin: string) {
+  return workerFetch("/open-message", {
+    method: "POST",
+    body: JSON.stringify({ messageId, pin }),
+  });
+}
