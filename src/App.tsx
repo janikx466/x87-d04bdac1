@@ -18,6 +18,7 @@ import MyMessages from "./pages/MyMessages";
 import Admin from "./pages/Admin";
 import Pricing from "./pages/Pricing";
 import Billing from "./pages/Billing";
+import CustomPlanOrder from "./pages/CustomPlanOrder";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import About from "./pages/About";
@@ -30,7 +31,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="top-center" />
       <SecurityOverlay />
       <BrowserRouter>
         <AuthProvider>
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/billing" element={<ProtectedRoute><Billing /></ProtectedRoute>} />
+            <Route path="/custom-plan" element={<ProtectedRoute><CustomPlanOrder /></ProtectedRoute>} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/about" element={<About />} />

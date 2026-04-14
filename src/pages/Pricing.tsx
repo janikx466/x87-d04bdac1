@@ -44,6 +44,16 @@ const tiers = [
     highlight: false,
     planKey: "Elite",
   },
+  {
+    name: "Custom",
+    credits: null,
+    price: "Custom",
+    priceLabel: "",
+    features: ["Unlimited credits", "Dedicated support", "Custom features", "SLA guarantee", "Priority processing"],
+    cta: "Contact Us",
+    highlight: false,
+    planKey: "Custom",
+  },
 ];
 
 const Pricing: React.FC = () => {
@@ -59,17 +69,18 @@ const Pricing: React.FC = () => {
         </h1>
         <p className="text-white/50 mb-12">Choose a plan that fits your needs. All paid plans expire after 30 days.</p>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           {tiers.map((t) => (
             <div
               key={t.name}
-              className={`p-6 rounded-3xl border text-left transition-all ${t.highlight ? "border-green-500/50 bg-green-500/5 scale-[1.02]" : "border-white/10 bg-white/5"}`}
+              className={`p-5 rounded-3xl border text-left transition-all ${t.highlight ? "border-green-500/50 bg-green-500/5 scale-[1.02]" : "border-white/10 bg-white/5"}`}
             >
               <h3 className="text-lg font-semibold mb-1">{t.name}</h3>
-              <p className="text-3xl font-bold mb-0">
+              <p className="text-2xl font-bold mb-0">
                 {t.price}<span className="text-sm font-normal text-white/40">{t.priceLabel}</span>
               </p>
-              <p className="text-xs text-white/40 mb-5">{t.credits} credits</p>
+              {t.credits && <p className="text-xs text-white/40 mb-4">{t.credits} credits</p>}
+              {!t.credits && <p className="text-xs text-white/40 mb-4">Tailored for you</p>}
               <ul className="space-y-2 mb-6">
                 {t.features.map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-white/70">
@@ -81,6 +92,8 @@ const Pricing: React.FC = () => {
                 onClick={() => {
                   if (!t.planKey) {
                     navigate(userData ? "/dashboard" : "/auth");
+                  } else if (t.planKey === "Custom") {
+                    navigate(userData ? "/custom-plan" : "/auth");
                   } else {
                     navigate(userData ? `/billing?plan=${t.planKey}` : "/auth");
                   }

@@ -20,6 +20,7 @@ export interface UserData {
   totalViews: number;
   referrals: number;
   createdAt: any;
+  numericUid?: string;
 }
 
 interface AuthContextType {
@@ -43,6 +44,14 @@ function generateInviteCode(): string {
   return code;
 }
 
+function generateNumericUid(): string {
+  let uid = "";
+  for (let i = 0; i < 8; i++) {
+    uid += Math.floor(Math.random() * 10).toString();
+  }
+  return uid;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -56,11 +65,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
         return;
       }
-      // Listen for realtime user data
       const userRef = doc(db, "users", firebaseUser.uid);
-      const unsubSnap = onSnapshot(userRef, (snap) => {
+      const unsubSnap = onSnapshot(userRef, async (snap) => {
         if (snap.exists()) {
-          setUserData({ uid: firebaseUser.uid, ...snap.data() } as UserData);
+          const data = snap.data();
+          // Auto-generate numericUid if missing
+          if (!data.numericUid) {
+            const nuid = generateNumericUid();
+            await setDoc(userRef, { numericUid: nuid }, { merge: true });
+          }
+          setUserData({ uid: firebaseUser.uid, ...data } as UserData);
         }
         setLoading(false);
       }, () => setLoading(false));
@@ -78,7 +92,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const existing = await getDoc(userRef);
 
     if (!existing.exists()) {
-      // First signup
       const inviteCode = generateInviteCode();
       const searchParams = new URLSearchParams(window.location.search);
       const refCode = searchParams.get("ref") || "";
@@ -98,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         credits = res.credits ?? 5;
         planName = res.planName ?? "Free Trial";
-      } catch { /* worker might be down, default credits */ }
+      } catch { /* worker might be down */ }
 
       await setDoc(userRef, {
         email: u.email || "",
@@ -107,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         credits,
         planName,
         inviteCode,
+        numericUid: generateNumericUid(),
         termsAccepted,
         termsAcceptedAt: serverTimestamp(),
         isAdmin: false,
@@ -116,7 +130,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createdAt: serverTimestamp(),
       });
     } else {
-      // Existing user – update terms if needed
       if (termsAccepted) {
         await setDoc(userRef, { termsAccepted: true, termsAcceptedAt: serverTimestamp() }, { merge: true });
       }

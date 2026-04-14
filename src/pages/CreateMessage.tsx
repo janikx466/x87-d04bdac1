@@ -1,13 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, updateDoc, increment, serverTimestamp, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import QRCodeCard from "@/components/QRCodeCard";
 import { toast } from "sonner";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Copy, Eye } from "lucide-react";
 
+// Track message count for credit deduction (5 messages = 1 credit)
 const CreateMessage: React.FC = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
@@ -27,12 +28,31 @@ const CreateMessage: React.FC = () => {
   if (!userData) return <OrbitalLoader />;
 
   if (createdId) {
+    const messageUrl = `https://x87.lovable.app/m/${createdId}`;
     return (
       <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center px-4">
         <h2 className="text-2xl font-bold text-white mb-2">Secret Message Created! 🔒</h2>
         <p className="text-white/50 text-sm mb-4">Share the QR code or link</p>
         <QRCodeCard vaultId={createdId} reminderText={createdReminder} type="message" />
-        <button onClick={() => navigate("/dashboard")} className="mt-6 px-6 py-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition">
+        <div className="flex gap-3 mt-6 animate-fade-in">
+          <button
+            onClick={() => navigate(`/m/${createdId}`)}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition hover:scale-[1.02]"
+            style={{ background: "linear-gradient(135deg, #9333ea, #7c3aed)" }}
+          >
+            <Eye className="w-4 h-4" /> View Message
+          </button>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(messageUrl);
+              toast.success("Message link copied!");
+            }}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-white/10 hover:bg-white/20 transition hover:scale-[1.02]"
+          >
+            <Copy className="w-4 h-4" /> Copy URL
+          </button>
+        </div>
+        <button onClick={() => navigate("/dashboard")} className="mt-4 px-6 py-3 rounded-xl bg-white/5 text-white/50 hover:bg-white/10 transition text-sm">
           Back to Dashboard
         </button>
       </div>
@@ -50,7 +70,17 @@ const CreateMessage: React.FC = () => {
   const handleCreate = async () => {
     if (!pin || pin.length < 4) return toast.error("PIN must be at least 4 digits");
     if (!message.trim()) return toast.error("Enter a message");
-    if ((userData.credits || 0) < 1) return toast.error("Not enough credits");
+
+    // Check if we need to deduct a credit (every 5 messages)
+    const userRef = doc(db, "users", userData.uid);
+    const userSnap = await getDoc(userRef);
+    const currentData = userSnap.data();
+    const msgCount = (currentData?.messagesCreated || 0) + 1;
+    const needsCredit = msgCount % 5 === 1; // Deduct on 1st, 6th, 11th, etc.
+
+    if (needsCredit && (userData.credits || 0) < 1) {
+      return toast.error("Not enough credits");
+    }
 
     setCreating(true);
     try {
@@ -67,13 +97,16 @@ const CreateMessage: React.FC = () => {
         copyAllowed,
         reminderText: reminderText.trim(),
         status: "active",
+        isDeleted: false,
         expiry,
         createdAt: serverTimestamp(),
       });
 
-      await updateDoc(doc(db, "users", userData.uid), {
-        credits: increment(-1),
-      });
+      const updates: any = { messagesCreated: increment(1) };
+      if (needsCredit) {
+        updates.credits = increment(-1);
+      }
+      await updateDoc(userRef, updates);
 
       setCreatedReminder(reminderText.trim());
       setCreatedId(messageId);
@@ -161,9 +194,9 @@ const CreateMessage: React.FC = () => {
         </div>
 
         <button onClick={handleCreate} className="w-full py-3.5 rounded-xl font-bold text-white transition hover:scale-[1.01]" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 10px 30px rgba(22,163,74,0.3)" }}>
-          Create Secret Message (1 Credit)
+          Create Secret Message
         </button>
-        <p className="text-center text-xs text-white/30 mt-3">Available: {userData.credits} credits</p>
+        <p className="text-center text-xs text-white/30 mt-3">5 messages = 1 credit • Available: {userData.credits} credits</p>
       </div>
     </div>
   );

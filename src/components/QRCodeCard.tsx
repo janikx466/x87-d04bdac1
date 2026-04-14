@@ -8,9 +8,10 @@ interface QRCodeCardProps {
   vaultId: string;
   reminderText?: string;
   type?: "vault" | "message";
+  shortCode?: string;
 }
 
-const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId, reminderText, type = "vault" }) => {
+const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId, reminderText, type = "vault", shortCode }) => {
   const qrRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
 
@@ -97,7 +98,6 @@ const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId, reminderText, type = "
       } catch { /* user cancelled */ }
     } else {
       navigator.clipboard.writeText(`${hookText}\n${shareUrl}`);
-      // Using a simple alert since we can't import toast here cleanly
     }
   };
 
@@ -122,6 +122,25 @@ const QRCodeCard: React.FC<QRCodeCardProps> = ({ vaultId, reminderText, type = "
               </span>
             </div>
           )}
+
+          {/* Short Code badge */}
+          {shortCode && (
+            <div style={{ marginBottom: "8px", display: "flex", justifyContent: "center" }}>
+              <span style={{
+                background: "linear-gradient(135deg, #2563eb, #9333ea)",
+                color: "#fff",
+                padding: "3px 12px",
+                borderRadius: "8px",
+                fontSize: "11px",
+                fontWeight: "bold",
+                letterSpacing: "2px",
+                fontFamily: "monospace",
+              }}>
+                {shortCode}
+              </span>
+            </div>
+          )}
+
           <div ref={qrRef} className="mb-4 inline-block" style={{ borderRadius: "20px" }} />
           <div className="mb-3 px-2">
             <span style={{ fontSize: "14px", color: "#555", fontStyle: "italic", fontWeight: 300, display: "block", maxWidth: "280px", margin: "0 auto", lineHeight: 1.4 }}>

@@ -1,10 +1,13 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { collection, query, where, onSnapshot, doc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
+import AdminMessageInbox from "@/components/AdminMessageInbox";
 import { toast } from "sonner";
-import { Copy, Plus, Gift, LogOut, CreditCard, BarChart3, QrCode, Shield, MessageSquare, Zap, MoreVertical, User } from "lucide-react";
+import { Copy, Plus, Gift, LogOut, CreditCard, BarChart3, QrCode, Shield, MessageSquare, Zap, MoreVertical, User, Mail, FileText, Phone, Info } from "lucide-react";
 import logoSrc from "@/assets/logo.png";
 
 const Dashboard: React.FC = () => {
@@ -12,6 +15,27 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [showProfile, setShowProfile] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [secretMsgEnabled, setSecretMsgEnabled] = useState(true);
+
+  // Listen for unread admin messages
+  useEffect(() => {
+    if (!userData?.numericUid) return;
+    const q = query(collection(db, "admin_messages"), where("user_uid", "==", userData.numericUid), where("is_seen", "==", false));
+    const unsub = onSnapshot(q, (snap) => setUnreadCount(snap.size));
+    return () => unsub();
+  }, [userData?.numericUid]);
+
+  // Listen for secret message toggle
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "settings", "features"), (snap) => {
+      if (snap.exists()) {
+        setSecretMsgEnabled(snap.data().secretMessageEnabled !== false);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   if (loading) return <OrbitalLoader />;
   if (!userData) return <OrbitalLoader text="Loading profile..." />;
@@ -21,6 +45,11 @@ const Dashboard: React.FC = () => {
   const copyInvite = () => {
     navigator.clipboard.writeText(inviteLink);
     toast.success("Invite link copied!");
+  };
+
+  const copyUid = () => {
+    navigator.clipboard.writeText(userData.numericUid || "");
+    toast.success("UID copied!");
   };
 
   const joinDate = userData.createdAt?.toDate?.()
@@ -57,10 +86,26 @@ const Dashboard: React.FC = () => {
               <MoreVertical className="w-5 h-5" />
             </button>
             {showMenu && (
-              <div className="absolute right-0 top-10 w-40 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+              <div className="absolute right-0 top-10 w-44 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
                 <button onClick={() => { navigate("/my-vaults"); setShowMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition">My Vaults</button>
-                <button onClick={() => { navigate("/my-messages"); setShowMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition">My Messages</button>
+                {secretMsgEnabled && (
+                  <button onClick={() => { navigate("/my-messages"); setShowMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition">My Messages</button>
+                )}
                 <button onClick={() => { navigate("/pricing"); setShowMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition">Plans</button>
+                <div className="border-t border-white/10" />
+                <button onClick={() => { navigate("/privacy"); setShowMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition flex items-center gap-2">
+                  <Shield className="w-3.5 h-3.5" /> Privacy
+                </button>
+                <button onClick={() => { navigate("/terms"); setShowMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition flex items-center gap-2">
+                  <FileText className="w-3.5 h-3.5" /> Terms
+                </button>
+                <a href="mailto:secretgpv@gmail.com" className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition flex items-center gap-2 text-white">
+                  <Phone className="w-3.5 h-3.5" /> Contract
+                </a>
+                <button onClick={() => { navigate("/about"); setShowMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-white/5 transition flex items-center gap-2">
+                  <Info className="w-3.5 h-3.5" /> About
+                </button>
+                <div className="border-t border-white/10" />
                 <button onClick={logout} className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-white/5 transition">Logout</button>
               </div>
             )}
@@ -99,10 +144,37 @@ const Dashboard: React.FC = () => {
         <AnnouncementBanner />
       </div>
 
+      {/* Message Inbox Button */}
+      <div className="max-w-5xl mx-auto px-4 mt-4">
+        <button
+          onClick={() => setShowInbox(true)}
+          className="w-full p-3.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center gap-3"
+        >
+          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+            <Mail className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 text-left min-w-0">
+            <p className="font-semibold text-sm">Messages</p>
+            <p className="text-[11px] text-white/40">From SecretGPV Official</p>
+          </div>
+          {unreadCount > 0 && (
+            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{unreadCount}</span>
+          )}
+        </button>
+      </div>
+
       <div className="max-w-5xl mx-auto px-4 py-6">
         <div className="mb-6">
           <h1 className="text-xl font-bold">Welcome, {userData.displayName || "User"}!</h1>
           <p className="text-white/50 text-xs mt-1">{userData.planName} Plan</p>
+          {/* UID */}
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-xs text-white/30">UID:</span>
+            <span className="font-mono text-xs text-white/60">{userData.numericUid || "..."}</span>
+            <button onClick={copyUid} className="text-white/30 hover:text-white transition">
+              <Copy className="w-3 h-3" />
+            </button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -121,7 +193,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className={`grid ${secretMsgEnabled ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2"} gap-3 mb-6`}>
           <button onClick={() => navigate("/create-vault")} className="flex items-center gap-2 p-4 rounded-2xl bg-green-500/10 border border-green-500/30 hover:bg-green-500/20 transition text-left">
             <Plus className="w-5 h-5 text-green-500" />
             <div>
@@ -129,13 +201,15 @@ const Dashboard: React.FC = () => {
               <p className="text-[10px] text-white/50">Upload photos & QR</p>
             </div>
           </button>
-          <button onClick={() => navigate("/create-message")} className="flex items-center gap-2 p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition text-left">
-            <MessageSquare className="w-5 h-5 text-purple-400" />
-            <div>
-              <p className="font-semibold text-sm">Secret Message</p>
-              <p className="text-[10px] text-white/50">Send encrypted text</p>
-            </div>
-          </button>
+          {secretMsgEnabled && (
+            <button onClick={() => navigate("/create-message")} className="flex items-center gap-2 p-4 rounded-2xl bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500/20 transition text-left">
+              <MessageSquare className="w-5 h-5 text-purple-400" />
+              <div>
+                <p className="font-semibold text-sm">Secret Message</p>
+                <p className="text-[10px] text-white/50">Send encrypted text</p>
+              </div>
+            </button>
+          )}
           <button onClick={() => navigate("/my-vaults")} className="flex items-center gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-left">
             <Shield className="w-5 h-5 text-green-500" />
             <div>
@@ -143,13 +217,15 @@ const Dashboard: React.FC = () => {
               <p className="text-[10px] text-white/50">Manage vaults</p>
             </div>
           </button>
-          <button onClick={() => navigate("/my-messages")} className="flex items-center gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-left">
-            <MessageSquare className="w-5 h-5 text-blue-400" />
-            <div>
-              <p className="font-semibold text-sm">My Messages</p>
-              <p className="text-[10px] text-white/50">View sent messages</p>
-            </div>
-          </button>
+          {secretMsgEnabled && (
+            <button onClick={() => navigate("/my-messages")} className="flex items-center gap-2 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition text-left">
+              <MessageSquare className="w-5 h-5 text-blue-400" />
+              <div>
+                <p className="font-semibold text-sm">My Messages</p>
+                <p className="text-[10px] text-white/50">View sent messages</p>
+              </div>
+            </button>
+          )}
         </div>
 
         {/* Invite */}
@@ -173,6 +249,9 @@ const Dashboard: React.FC = () => {
           ⚡ Upgrade Plan
         </button>
       </div>
+
+      {/* Inbox Modal */}
+      {showInbox && <AdminMessageInbox onClose={() => setShowInbox(false)} />}
     </div>
   );
 };

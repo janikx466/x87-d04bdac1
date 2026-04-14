@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadToR2 } from "@/lib/worker";
 import { doc, setDoc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
@@ -7,7 +7,14 @@ import { db } from "@/lib/firebase";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import QRCodeCard from "@/components/QRCodeCard";
 import { toast } from "sonner";
-import { Upload, X } from "lucide-react";
+import { Upload, X, Copy, Eye } from "lucide-react";
+
+function generateShortCode(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return `SG-${code}`;
+}
 
 const CreateVault: React.FC = () => {
   const { userData } = useAuth();
@@ -27,13 +34,36 @@ const CreateVault: React.FC = () => {
 
   if (!userData) return <OrbitalLoader />;
 
+  const requiredCredits = files.length;
+  const hasEnoughCredits = (userData.credits || 0) >= requiredCredits;
+
   if (createdVaultId) {
+    const vaultUrl = `https://x87.lovable.app/v/${createdVaultId}`;
+
     return (
       <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center px-4">
         <h2 className="text-2xl font-bold text-white mb-2">Vault Created! 🎉</h2>
         <p className="text-white/50 text-sm mb-4">Share the QR code to give access</p>
         <QRCodeCard vaultId={createdVaultId} reminderText={createdReminderText} />
-        <button onClick={() => navigate("/dashboard")} className="mt-6 px-6 py-3 rounded-xl bg-white/10 text-white hover:bg-white/20 transition">
+        <div className="flex gap-3 mt-6 animate-fade-in">
+          <button
+            onClick={() => navigate(`/v/${createdVaultId}`)}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition hover:scale-[1.02]"
+            style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}
+          >
+            <Eye className="w-4 h-4" /> View Vault
+          </button>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(vaultUrl);
+              toast.success("Vault link copied!");
+            }}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-white/10 hover:bg-white/20 transition hover:scale-[1.02]"
+          >
+            <Copy className="w-4 h-4" /> Copy URL
+          </button>
+        </div>
+        <button onClick={() => navigate("/dashboard")} className="mt-4 px-6 py-3 rounded-xl bg-white/5 text-white/50 hover:bg-white/10 transition text-sm">
           Back to Dashboard
         </button>
       </div>
@@ -51,14 +81,14 @@ const CreateVault: React.FC = () => {
   const handleCreate = async () => {
     if (!pin || pin.length < 4) return toast.error("PIN must be at least 4 digits");
     if (files.length === 0) return toast.error("Upload at least one photo");
-    if ((userData.credits || 0) < 1) return toast.error("Not enough credits");
+    if (!hasEnoughCredits) return toast.error(`Not enough credits. Need ${requiredCredits}, have ${userData.credits}`);
 
     setCreating(true);
     try {
       const vaultId = crypto.randomUUID().slice(0, 12);
+      const shortCode = generateShortCode();
       const fileKeys: string[] = [];
 
-      // Upload all files in parallel for speed
       await Promise.all(
         files.map(async (file) => {
           const key = `vaults/${vaultId}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
@@ -79,12 +109,13 @@ const CreateVault: React.FC = () => {
         downloadAllowed,
         reminderText: reminderText.trim() || "Scan this to unlock your private vault photos",
         status: "active",
+        shortCode,
         expiry,
         createdAt: serverTimestamp(),
       });
 
       await updateDoc(doc(db, "users", userData.uid), {
-        credits: increment(-1),
+        credits: increment(-requiredCredits),
         vaultsCreated: increment(1),
       });
 
@@ -114,7 +145,22 @@ const CreateVault: React.FC = () => {
           <label className="flex flex-col items-center gap-2 p-8 rounded-2xl border-2 border-dashed border-white/20 hover:border-green-500/50 cursor-pointer transition">
             <Upload className="w-8 h-8 text-white/40" />
             <span className="text-sm text-white/50">Click to upload photos</span>
-            <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const selected = Array.from(e.target.files || []);
+                const maxSelectable = userData.credits || 0;
+                if (selected.length > maxSelectable) {
+                  toast.error(`You can select max ${maxSelectable} images (your credits)`);
+                  setFiles(selected.slice(0, maxSelectable));
+                } else {
+                  setFiles(selected);
+                }
+              }}
+            />
           </label>
           {files.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -125,6 +171,9 @@ const CreateVault: React.FC = () => {
                 </span>
               ))}
             </div>
+          )}
+          {files.length > 0 && (
+            <p className="text-xs text-white/40 mt-1">Cost: {files.length} credit{files.length > 1 ? "s" : ""} (1 per image)</p>
           )}
         </div>
 
@@ -179,9 +228,21 @@ const CreateVault: React.FC = () => {
           <label className="text-sm text-white/70">Allow photo downloads</label>
         </div>
 
-        <button onClick={handleCreate} className="w-full py-3.5 rounded-xl font-bold text-white transition hover:scale-[1.01]" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 10px 30px rgba(22,163,74,0.3)" }}>
-          Create Vault (1 Credit)
-        </button>
+        {(userData.credits || 0) === 0 ? (
+          <div className="text-center p-4 rounded-xl bg-red-500/10 border border-red-500/30">
+            <p className="text-red-400 text-sm font-medium">No credits left. Please upgrade.</p>
+            <button onClick={() => navigate("/pricing")} className="mt-2 text-xs text-green-400 hover:underline">View Plans →</button>
+          </div>
+        ) : (
+          <button
+            onClick={handleCreate}
+            disabled={!hasEnoughCredits || files.length === 0}
+            className="w-full py-3.5 rounded-xl font-bold text-white transition hover:scale-[1.01] disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)", boxShadow: "0 10px 30px rgba(22,163,74,0.3)" }}
+          >
+            Create Vault ({requiredCredits || 1} Credit{requiredCredits > 1 ? "s" : ""})
+          </button>
+        )}
         <p className="text-center text-xs text-white/30 mt-3">Available: {userData.credits} credits</p>
       </div>
     </div>
