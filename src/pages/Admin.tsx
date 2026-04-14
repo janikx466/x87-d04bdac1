@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp, onSnapshot, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp, onSnapshot, getDoc, addDoc, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import { toast } from "sonner";
-import { Users, Shield, BarChart3, Clock, Megaphone } from "lucide-react";
+import { Users, Shield, BarChart3, Clock, Megaphone, MessageSquare, Search, Send } from "lucide-react";
 
 interface RedeemCodeData {
   id: string;
@@ -26,6 +26,7 @@ interface UserEntry {
   inviteCode: string;
   isAdmin: boolean;
   createdAt: any;
+  numericUid?: string;
 }
 
 interface VaultEntry {
@@ -38,7 +39,7 @@ interface VaultEntry {
 const Admin: React.FC = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<"stats" | "codes" | "users" | "announce">("stats");
+  const [tab, setTab] = useState<"stats" | "codes" | "users" | "announce" | "custom" | "features">("stats");
   const [codes, setCodes] = useState<RedeemCodeData[]>([]);
   const [users, setUsers] = useState<UserEntry[]>([]);
   const [vaults, setVaults] = useState<VaultEntry[]>([]);
@@ -54,6 +55,19 @@ const Admin: React.FC = () => {
   const [annText, setAnnText] = useState("");
   const [annUrl, setAnnUrl] = useState("");
   const [annSaving, setAnnSaving] = useState(false);
+
+  // Custom Plan
+  const [cpStep, setCpStep] = useState(1);
+  const [cpUid, setCpUid] = useState("");
+  const [cpUser, setCpUser] = useState<UserEntry | null>(null);
+  const [cpCredits, setCpCredits] = useState("");
+  const [cpMessage, setCpMessage] = useState("");
+  const [cpVerify, setCpVerify] = useState(false);
+  const [cpSending, setCpSending] = useState(false);
+
+  // Features
+  const [secretMsgEnabled, setSecretMsgEnabled] = useState(true);
+  const [featureSaving, setFeatureSaving] = useState(false);
 
   useEffect(() => {
     if (!userData?.isAdmin) {
@@ -72,13 +86,18 @@ const Admin: React.FC = () => {
       setCodes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RedeemCodeData)));
     });
 
-    // Load announcement
     getDoc(doc(db, "settings", "announcement")).then((snap) => {
       if (snap.exists()) {
         const d = snap.data();
         setAnnEnabled(d.enabled || false);
         setAnnText(d.text || "");
         setAnnUrl(d.url || "");
+      }
+    });
+
+    getDoc(doc(db, "settings", "features")).then((snap) => {
+      if (snap.exists()) {
+        setSecretMsgEnabled(snap.data().secretMessageEnabled !== false);
       }
     });
 
@@ -131,6 +150,52 @@ const Admin: React.FC = () => {
     setAnnSaving(false);
   };
 
+  const saveFeatures = async () => {
+    setFeatureSaving(true);
+    try {
+      await setDoc(doc(db, "settings", "features"), { secretMessageEnabled: secretMsgEnabled }, { merge: true });
+      toast.success("Feature settings saved!");
+    } catch { toast.error("Failed to save"); }
+    setFeatureSaving(false);
+  };
+
+  // Custom Plan: lookup user by UID
+  const lookupUser = () => {
+    const found = users.find((u) => u.numericUid === cpUid.trim());
+    if (!found) {
+      toast.error("User not found with this UID");
+      return;
+    }
+    setCpUser(found);
+    setCpStep(2);
+  };
+
+  const sendCustomMessage = async () => {
+    if (!cpMessage.trim()) return toast.error("Message is required");
+    if (!cpUser) return;
+    setCpSending(true);
+    try {
+      await addDoc(collection(db, "admin_messages"), {
+        user_uid: cpUser.numericUid,
+        message: cpMessage.trim(),
+        is_seen: false,
+        verify_enabled: cpVerify,
+        credits: cpVerify ? Number(cpCredits) || 0 : 0,
+        timestamp: serverTimestamp(),
+      });
+      toast.success("Message sent!");
+      setCpStep(1);
+      setCpUid("");
+      setCpUser(null);
+      setCpCredits("");
+      setCpMessage("");
+      setCpVerify(false);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to send");
+    }
+    setCpSending(false);
+  };
+
   if (loading) return <OrbitalLoader />;
 
   const totalUsers = users.length;
@@ -143,16 +208,19 @@ const Admin: React.FC = () => {
     return created && now - created.getTime() < 86400000;
   }).length;
 
+  const tabs = ["stats", "codes", "users", "announce", "custom", "features"] as const;
+  const tabLabels: Record<string, string> = { stats: "Stats", codes: "Codes", users: "Users", announce: "Announce", custom: "Custom Plan", features: "Features" };
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-white px-4 py-8">
       <div className="max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold mb-6">Admin Panel</h1>
 
         <div className="flex gap-2 mb-6 flex-wrap">
-          {(["stats", "codes", "users", "announce"] as const).map((t) => (
+          {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition ${tab === t ? "bg-green-500 text-white" : "bg-white/5 text-white/60"}`}>
-              {t === "stats" ? "Stats" : t === "codes" ? "Redeem Codes" : t === "users" ? "Users" : "Announcement"}
+              className={`px-3 py-2 rounded-xl text-xs font-medium transition ${tab === t ? "bg-green-500 text-white" : "bg-white/5 text-white/60"}`}>
+              {tabLabels[t]}
             </button>
           ))}
         </div>
@@ -210,11 +278,11 @@ const Admin: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-white/40 text-left border-b border-white/10">
+                  <th className="py-3 px-2">UID</th>
                   <th className="py-3 px-2">Name</th>
                   <th className="py-3 px-2">Email</th>
                   <th className="py-3 px-2">Plan</th>
                   <th className="py-3 px-2">Credits</th>
-                  <th className="py-3 px-2">Invite</th>
                   <th className="py-3 px-2">Joined</th>
                 </tr>
               </thead>
@@ -223,6 +291,7 @@ const Admin: React.FC = () => {
                   const joined = u.createdAt?.toDate?.() || (u.createdAt?.seconds ? new Date(u.createdAt.seconds * 1000) : null);
                   return (
                     <tr key={u.uid} className="border-b border-white/5">
+                      <td className="py-3 px-2 font-mono text-xs text-white/40">{u.numericUid || "-"}</td>
                       <td className="py-3 px-2 text-white/70">{u.displayName || "-"}</td>
                       <td className="py-3 px-2 text-white/70">{u.email}</td>
                       <td className="py-3 px-2">
@@ -230,11 +299,11 @@ const Admin: React.FC = () => {
                           u.planName === "Free Trial" || u.planName === "No Trial" || u.planName === "Free"
                             ? "bg-white/10 text-white/50"
                             : u.planName === "Elite" ? "bg-yellow-500/20 text-yellow-400"
+                            : u.planName === "Custom" ? "bg-purple-500/20 text-purple-400"
                             : "bg-green-500/20 text-green-400"
                         }`}>{u.planName}</span>
                       </td>
                       <td className="py-3 px-2">{u.credits}</td>
-                      <td className="py-3 px-2 font-mono text-xs text-white/40">{u.inviteCode}</td>
                       <td className="py-3 px-2 text-xs text-white/40">{joined ? joined.toLocaleDateString() : "-"}</td>
                     </tr>
                   );
@@ -261,6 +330,77 @@ const Admin: React.FC = () => {
             </div>
             <button onClick={saveAnnouncement} disabled={annSaving} className="px-6 py-2 rounded-xl font-semibold text-white" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
               {annSaving ? "Saving..." : "Save Announcement"}
+            </button>
+          </div>
+        )}
+
+        {tab === "custom" && (
+          <div className="max-w-lg">
+            <h3 className="font-semibold mb-4 flex items-center gap-2"><MessageSquare className="w-5 h-5 text-purple-400" /> Custom Plan Management</h3>
+
+            {cpStep === 1 && (
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
+                <label className="text-sm font-medium mb-2 block">Enter User UID (8-digit)</label>
+                <div className="flex gap-2">
+                  <input
+                    value={cpUid}
+                    onChange={(e) => setCpUid(e.target.value)}
+                    placeholder="e.g. 12345678"
+                    maxLength={8}
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm outline-none font-mono"
+                  />
+                  <button onClick={lookupUser} className="px-4 py-2 rounded-xl bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition flex items-center gap-2">
+                    <Search className="w-4 h-4" /> Find
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {cpStep === 2 && cpUser && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                  <p className="text-sm text-white/70 mb-1">Email: <span className="text-white">{cpUser.email}</span></p>
+                  <p className="text-sm text-white/70">Joined: <span className="text-white">
+                    {cpUser.createdAt?.toDate ? cpUser.createdAt.toDate().toLocaleDateString() : cpUser.createdAt?.seconds ? new Date(cpUser.createdAt.seconds * 1000).toLocaleDateString() : "-"}
+                  </span></p>
+                  <p className="text-sm text-white/70">Current Plan: <span className="text-white">{cpUser.planName}</span></p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                  <div>
+                    <label className="text-xs text-white/50 mb-1 block">Credit Amount</label>
+                    <input type="number" value={cpCredits} onChange={(e) => setCpCredits(e.target.value)} placeholder="e.g. 5000" className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/50 mb-1 block">Custom Message *</label>
+                    <textarea value={cpMessage} onChange={(e) => setCpMessage(e.target.value)} placeholder="Message to user..." rows={4} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none resize-none" />
+                  </div>
+                  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl">
+                    <input type="checkbox" checked={cpVerify} onChange={(e) => setCpVerify(e.target.checked)} className="accent-green-500 w-4 h-4" />
+                    <label className="text-sm text-white/70">Enable Verify (allows plan activation)</label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button onClick={() => { setCpStep(1); setCpUser(null); }} className="flex-1 py-2 rounded-xl bg-white/5 text-white/50 text-sm">Back</button>
+                    <button onClick={sendCustomMessage} disabled={cpSending} className="flex-1 py-2 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
+                      <Send className="w-4 h-4" /> {cpSending ? "Sending..." : "Send Message"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "features" && (
+          <div className="p-5 rounded-2xl bg-white/5 border border-white/10 max-w-lg">
+            <h3 className="font-semibold mb-4">Feature Toggles</h3>
+            <div className="flex items-center gap-3 mb-4 bg-white/5 p-3 rounded-xl">
+              <input type="checkbox" checked={secretMsgEnabled} onChange={(e) => setSecretMsgEnabled(e.target.checked)} className="accent-green-500 w-4 h-4" />
+              <label className="text-sm text-white/70">Secret Message System (ON/OFF)</label>
+            </div>
+            <button onClick={saveFeatures} disabled={featureSaving} className="px-6 py-2 rounded-xl font-semibold text-white" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
+              {featureSaving ? "Saving..." : "Save Features"}
             </button>
           </div>
         )}

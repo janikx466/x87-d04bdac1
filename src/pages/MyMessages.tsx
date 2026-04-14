@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import QRCodeCard from "@/components/QRCodeCard";
@@ -20,6 +20,7 @@ interface Message {
   expiry: any;
   createdAt: any;
   reminderText: string;
+  isDeleted?: boolean;
 }
 
 function getExpiryDate(expiry: any): Date | null {
@@ -65,7 +66,7 @@ const MessageCard: React.FC<{ msg: Message }> = ({ msg }) => {
 
   const handleDelete = async () => {
     if (!confirm("Delete this message permanently?")) return;
-    await updateDoc(doc(db, "messages", msg.id), { status: "deleted" });
+    await updateDoc(doc(db, "messages", msg.id), { status: "deleted", isDeleted: true });
     toast.success("Message deleted");
   };
 
@@ -82,7 +83,7 @@ const MessageCard: React.FC<{ msg: Message }> = ({ msg }) => {
           <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusColor}`}>{statusLabel}</span>
         </div>
 
-        <p className="text-sm text-white/60 mb-2 truncate">{msg.message}</p>
+        <p className="text-sm text-white/60 mb-2 truncate break-all">{msg.message}</p>
 
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs text-white/40">PIN:</span>
@@ -145,7 +146,7 @@ const MyMessages: React.FC = () => {
       setMessages(
         snap.docs
           .map((d) => ({ id: d.id, ...d.data() } as Message))
-          .filter((m) => m.status !== "deleted")
+          .filter((m) => m.status !== "deleted" && !m.isDeleted)
       );
       setLoading(false);
     }, () => setLoading(false));

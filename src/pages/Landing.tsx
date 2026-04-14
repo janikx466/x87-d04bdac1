@@ -87,7 +87,7 @@ const Landing: React.FC = () => {
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-white/10 text-center text-white/40 text-sm">
         <p>© {new Date().getFullYear()} SecretGPV. All rights reserved.</p>
-        <p className="mt-1">Contact: secretgpv.@gmail.com</p>
+        <p className="mt-1">Contact: secretgpv@gmail.com</p>
         <div className="flex justify-center gap-4 mt-3">
           <Link to="/privacy" className="hover:text-white transition">Privacy</Link>
           <Link to="/terms" className="hover:text-white transition">Terms</Link>

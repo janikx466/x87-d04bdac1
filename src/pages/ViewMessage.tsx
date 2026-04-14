@@ -60,6 +60,12 @@ const ViewMessage: React.FC = () => {
 
       const data = snap.data();
 
+      // Check isDeleted flag
+      if (data.isDeleted) {
+        setStatusMessage("Message was Deleted");
+        return;
+      }
+
       // Check status
       if (data.status === "stopped") {
         setStatusMessage("Message Temporarily Blocked");
@@ -131,7 +137,7 @@ const ViewMessage: React.FC = () => {
           <MessageSquare className="w-10 h-10 text-green-500 mx-auto mb-3" />
           <h2 className="text-lg font-bold mb-4">🔓 Secret Message</h2>
           <div
-            className="p-4 rounded-xl bg-white/5 border border-white/10 text-left text-white/90 text-sm leading-relaxed whitespace-pre-wrap mb-4"
+            className="p-4 rounded-xl bg-white/5 border border-white/10 text-left text-white/90 text-sm leading-relaxed whitespace-pre-wrap break-all mb-4"
             style={!copyAllowed ? { userSelect: "none", WebkitUserSelect: "none" } : {}}
           >
             {revealedMessage}
