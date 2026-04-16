@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 const Terms: React.FC = () => (
   <div className="min-h-screen bg-[#0f172a] text-white px-4 py-16">
     <div className="max-w-3xl mx-auto">
-      <Link to="/" className="text-white/50 hover:text-white text-sm">← Home</Link>
+      <Link to="/dashboard" className="text-white/50 hover:text-white text-sm">← Back Dashboard</Link>
       <h1 className="text-3xl font-bold mt-4 mb-6">Terms & Conditions</h1>
       <div className="space-y-4 text-white/70 text-sm leading-relaxed">
         <p>Last updated: {new Date().toLocaleDateString()}</p>
@@ -19,7 +19,7 @@ const Terms: React.FC = () => (
         <h2 className="text-lg font-semibold text-white">5. Limitation of Liability</h2>
         <p>SecretGPV is provided "as is" without warranties. We are not liable for data loss due to vault expiry or self-destruction features working as intended.</p>
         <h2 className="text-lg font-semibold text-white">6. Contact</h2>
-        <p>Questions? Contact us at secretgpv.@gmail.com</p>
+        <p>Questions? Contact us at secretgpv@gmail.com</p>
       </div>
     </div>
   </div>

@@ -70,6 +70,19 @@ export async function uploadToR2(file: File, fileName: string) {
   }
 }
 
+export async function deleteFromR2(fileName: string) {
+  try {
+    const res = await fetch(`${WORKER_URL}?file=${encodeURIComponent(fileName)}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) throw new Error("Delete failed");
+    return true;
+  } catch (err: any) {
+    console.error("Delete Error:", err);
+    throw new Error("Delete failed");
+  }
+}
+
 export async function createMessage(data: {
   messageId: string;
   message: string;

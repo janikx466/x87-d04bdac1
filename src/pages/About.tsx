@@ -5,8 +5,8 @@ import logoSrc from "@/assets/logo.png";
 const About: React.FC = () => (
   <div className="min-h-screen bg-[#0f172a] text-white px-4 py-16">
     <div className="max-w-3xl mx-auto text-center">
-      <Link to="/" className="text-white/50 hover:text-white text-sm">← Home</Link>
-      <img src={logoSrc} alt="SecretGPV" className="w-20 h-20 mx-auto mt-6 mb-4" />
+      <Link to="/dashboard" className="text-white/50 hover:text-white text-sm">← Back Dashboard</Link>
+      <img src={logoSrc} alt="SecretGPV secure private photo vault logo with QR code sharing" className="w-20 h-20 mx-auto mt-6 mb-4" />
       <h1 className="text-3xl font-bold mb-4">About Secret<span className="text-green-500">GPV</span></h1>
       <p className="text-white/60 leading-relaxed mb-8">
         SecretGPV is a privacy-first photo sharing platform built for people who value their digital privacy.

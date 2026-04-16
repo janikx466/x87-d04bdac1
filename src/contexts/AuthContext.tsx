@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc, onSnapshot, serverTimestamp } from "firebase/fires
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { getDeviceId } from "@/lib/fingerprint";
 import { registerUser } from "@/lib/worker";
+import { toast } from "sonner";
 
 export interface UserData {
   uid: string;
@@ -21,6 +22,8 @@ export interface UserData {
   referrals: number;
   createdAt: any;
   numericUid?: string;
+  planExpiry?: any;
+  planStart?: any;
 }
 
 interface AuthContextType {
@@ -69,7 +72,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const unsubSnap = onSnapshot(userRef, async (snap) => {
         if (snap.exists()) {
           const data = snap.data();
-          // Auto-generate numericUid if missing
           if (!data.numericUid) {
             const nuid = generateNumericUid();
             await setDoc(userRef, { numericUid: nuid }, { merge: true });
@@ -97,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const refCode = searchParams.get("ref") || "";
 
       let deviceId = "";
-      try { deviceId = await getDeviceId(); } catch { /* ignore */ }
+      try { deviceId = await getDeviceId(); } catch {}
 
       let credits = 5;
       let planName = "Free Trial";
@@ -111,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         credits = res.credits ?? 5;
         planName = res.planName ?? "Free Trial";
-      } catch { /* worker might be down */ }
+      } catch {}
 
       await setDoc(userRef, {
         email: u.email || "",
@@ -127,8 +129,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         vaultsCreated: 0,
         totalViews: 0,
         referrals: 0,
+        messagesCreated: 0,
         createdAt: serverTimestamp(),
       });
+
+      // Welcome toast for new users
+      setTimeout(() => toast.success("Welcome! You received 5 free credits 🎉"), 1500);
     } else {
       if (termsAccepted) {
         await setDoc(userRef, { termsAccepted: true, termsAcceptedAt: serverTimestamp() }, { merge: true });
