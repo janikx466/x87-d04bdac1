@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { uploadToR2, deleteFromR2 } from "@/lib/worker";
+import { uploadToR2, deleteFromR2, verifyVault } from "@/lib/worker";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import QRCodeCard from "@/components/QRCodeCard";
 import { toast } from "sonner";
@@ -259,10 +259,10 @@ const EditVaultModal: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault
   );
 };
 
-const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: () => void; onClose: () => void }> = ({ vault, onClose, onSuccess }) => {
+const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: (pin: string) => void; onClose: () => void }> = ({ vault, onClose, onSuccess }) => {
   const [pin, setPin] = useState("");
   const verify = () => {
-    if (pin === vault.pin) { onSuccess(); } else { toast.error("Wrong PIN"); }
+    if (pin === vault.pin) { onSuccess(pin); } else { toast.error("Wrong PIN"); }
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
@@ -282,8 +282,10 @@ const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: () => void; onClose: (
 
 // --- Image Edit Mode (Fixed Logic) ---
 
-const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault, onClose }) => {
+const ImageEditMode: React.FC<{ vault: Vault; pin: string; onClose: () => void }> = ({ vault, pin, onClose }) => {
   const [fileKeys, setFileKeys] = useState<string[]>(vault.fileKeys || []);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [replacingIdx, setReplacingIdx] = useState<number | null>(null);
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
@@ -292,16 +294,27 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
   const fileInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  const displayKeys = showAll ? fileKeys : fileKeys.slice(0, 4);
+  // Fetch resolved image URLs through the same worker endpoint as ViewVault
+  // This guarantees identical data source and rendering behavior.
+  const refreshImages = useCallback(async () => {
+    try {
+      const res: any = await verifyVault(vault.id, pin);
+      const urls: string[] = res?.images || [];
+      setImageUrls(urls);
+      console.log("Edit Mode Images:", urls.length, urls);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load images");
+    } finally {
+      setLoading(false);
+    }
+  }, [vault.id, pin]);
 
-  // URL Logic: Matching ViewVault style
-  const getImageUrl = (key: string) => {
-    if (!key) return "";
-    // If it's already a full URL
-    if (key.startsWith("http")) return key;
-    // Otherwise, Route through Worker to handle R2 fetch correctly
-    return `${WORKER_URL}?file=${encodeURIComponent(key)}`;
-  };
+  useEffect(() => {
+    refreshImages();
+  }, [refreshImages]);
+
+  const displayKeys = showAll ? fileKeys : fileKeys.slice(0, 4);
+  const displayUrls = showAll ? imageUrls : imageUrls.slice(0, 4);
 
   const imageRef = useCallback((node: HTMLDivElement | null) => {
     if (!node) return;
