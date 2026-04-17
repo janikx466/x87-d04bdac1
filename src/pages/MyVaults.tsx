@@ -543,8 +543,8 @@ const MyVaults: React.FC = () => {
         )}
 
         {editVault && <EditVaultModal vault={editVault} onClose={() => setEditVault(null)} />}
-        {pinVerifyVault && <PinVerifyModal vault={pinVerifyVault} onClose={() => setPinVerifyVault(null)} onSuccess={() => { setImageEditVault(pinVerifyVault); setPinVerifyVault(null); }} />}
-        {imageEditVault && <ImageEditMode vault={imageEditVault} onClose={() => setImageEditVault(null)} />}
+        {pinVerifyVault && <PinVerifyModal vault={pinVerifyVault} onClose={() => setPinVerifyVault(null)} onSuccess={(pin) => { setEditPin(pin); setImageEditVault(pinVerifyVault); setPinVerifyVault(null); }} />}
+        {imageEditVault && <ImageEditMode vault={imageEditVault} pin={editPin} onClose={() => { setImageEditVault(null); setEditPin(""); }} />}
       </div>
     </div>
   );
