@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { uploadToR2, deleteFromR2 } from "@/lib/worker";
+import { uploadToR2, deleteFromR2, verifyVault } from "@/lib/worker";
 import OrbitalLoader from "@/components/OrbitalLoader";
 import QRCodeCard from "@/components/QRCodeCard";
 import { toast } from "sonner";
@@ -259,10 +259,10 @@ const EditVaultModal: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault
   );
 };
 
-const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: () => void; onClose: () => void }> = ({ vault, onClose, onSuccess }) => {
+const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: (pin: string) => void; onClose: () => void }> = ({ vault, onClose, onSuccess }) => {
   const [pin, setPin] = useState("");
   const verify = () => {
-    if (pin === vault.pin) { onSuccess(); } else { toast.error("Wrong PIN"); }
+    if (pin === vault.pin) { onSuccess(pin); } else { toast.error("Wrong PIN"); }
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
@@ -282,8 +282,10 @@ const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: () => void; onClose: (
 
 // --- Image Edit Mode (Fixed Logic) ---
 
-const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault, onClose }) => {
+const ImageEditMode: React.FC<{ vault: Vault; pin: string; onClose: () => void }> = ({ vault, pin, onClose }) => {
   const [fileKeys, setFileKeys] = useState<string[]>(vault.fileKeys || []);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [replacingIdx, setReplacingIdx] = useState<number | null>(null);
   const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
@@ -292,16 +294,27 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
   const fileInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  const displayKeys = showAll ? fileKeys : fileKeys.slice(0, 4);
+  // Fetch resolved image URLs through the same worker endpoint as ViewVault
+  // This guarantees identical data source and rendering behavior.
+  const refreshImages = useCallback(async () => {
+    try {
+      const res: any = await verifyVault(vault.id, pin);
+      const urls: string[] = res?.images || [];
+      setImageUrls(urls);
+      console.log("Edit Mode Images:", urls.length, urls);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to load images");
+    } finally {
+      setLoading(false);
+    }
+  }, [vault.id, pin]);
 
-  // URL Logic: Matching ViewVault style
-  const getImageUrl = (key: string) => {
-    if (!key) return "";
-    // If it's already a full URL
-    if (key.startsWith("http")) return key;
-    // Otherwise, Route through Worker to handle R2 fetch correctly
-    return `${WORKER_URL}?file=${encodeURIComponent(key)}`;
-  };
+  useEffect(() => {
+    refreshImages();
+  }, [refreshImages]);
+
+  const displayKeys = showAll ? fileKeys : fileKeys.slice(0, 4);
+  const displayUrls = showAll ? imageUrls : imageUrls.slice(0, 4);
 
   const imageRef = useCallback((node: HTMLDivElement | null) => {
     if (!node) return;
@@ -329,6 +342,7 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
       newKeys[idx] = newKey;
       await updateDoc(doc(db, "vaults", vault.id), { fileKeys: newKeys });
       setFileKeys(newKeys);
+      await refreshImages();
       toast.success("Image replaced!");
     } catch (err: any) {
       toast.error(err.message || "Replace failed");
@@ -344,6 +358,7 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
       const newKeys = fileKeys.filter((_, i) => i !== idx);
       await updateDoc(doc(db, "vaults", vault.id), { fileKeys: newKeys });
       setFileKeys(newKeys);
+      await refreshImages();
       toast.success("Image deleted!");
     } catch (err: any) {
       toast.error(err.message || "Delete failed");
@@ -361,54 +376,63 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 bg-[#0f172a]">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {displayKeys.map((key, idx) => (
-            <div key={key + idx} ref={imageRef} data-idx={idx} className="relative group rounded-2xl overflow-hidden bg-white/5 aspect-square border border-white/5">
-              {(loadedImages.has(idx) || idx < 4) ? (
-                <img 
-                  src={getImageUrl(key)} 
-                  alt={`Image ${idx + 1}`} 
-                  className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105" 
-                  onClick={() => setFullscreenIdx(idx)} 
-                  loading="lazy"
-                  crossOrigin="anonymous" // Essential for CORS matching ViewVault
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-white/10 animate-spin" />
-                </div>
-              )}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-10 h-10 text-green-500 animate-spin mb-4" />
+            <p className="text-white/40 text-sm">Loading images...</p>
+          </div>
+        ) : displayUrls.length === 0 ? (
+          <div className="text-center text-white/40 py-20 text-sm">No images in this vault.</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {displayUrls.map((url, idx) => (
+              <div key={(displayKeys[idx] || idx) + "-" + idx} ref={imageRef} data-idx={idx} className="relative group rounded-2xl overflow-hidden bg-white/5 aspect-square border border-white/5">
+                {(loadedImages.has(idx) || idx < 4) ? (
+                  <img
+                    src={url}
+                    alt={`Image ${idx + 1}`}
+                    className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105"
+                    onClick={() => setFullscreenIdx(idx)}
+                    loading="lazy"
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 text-white/10 animate-spin" />
+                  </div>
+                )}
 
-              {replacingIdx === idx && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
-                  <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
-                </div>
-              )}
-              {deletingIdx === idx && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
-                  <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
-                </div>
-              )}
+                {replacingIdx === idx && (
+                  <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
+                    <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
+                  </div>
+                )}
+                {deletingIdx === idx && (
+                  <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
+                    <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
+                  </div>
+                )}
 
-              <div className="absolute bottom-0 left-0 right-0 p-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-gradient-to-t from-black/90 to-transparent">
-                <button
-                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.setAttribute("data-replace-idx", String(idx)); fileInputRef.current?.click(); }}
-                  className="flex-1 flex items-center justify-center gap-1 text-[10px] py-2 rounded-xl bg-blue-500/20 text-blue-300 hover:bg-blue-500/40 backdrop-blur-md"
-                >
-                  <RefreshCw className="w-3 h-3" /> Replace
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(idx); }}
-                  className="flex-1 flex items-center justify-center gap-1 text-[10px] py-2 rounded-xl bg-red-500/20 text-red-300 hover:bg-red-500/40 backdrop-blur-md"
-                >
-                  <Trash2 className="w-3 h-3" /> Delete
-                </button>
+                <div className="absolute bottom-0 left-0 right-0 p-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-gradient-to-t from-black/90 to-transparent">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.setAttribute("data-replace-idx", String(idx)); fileInputRef.current?.click(); }}
+                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-2 rounded-xl bg-blue-500/20 text-blue-300 hover:bg-blue-500/40 backdrop-blur-md"
+                  >
+                    <RefreshCw className="w-3 h-3" /> Replace
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDelete(idx); }}
+                    className="flex-1 flex items-center justify-center gap-1 text-[10px] py-2 rounded-xl bg-red-500/20 text-red-300 hover:bg-red-500/40 backdrop-blur-md"
+                  >
+                    <Trash2 className="w-3 h-3" /> Delete
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {!showAll && fileKeys.length > 4 && (
+        {!loading && !showAll && fileKeys.length > 4 && (
           <button onClick={() => setShowAll(true)} className="w-full mt-6 py-4 rounded-2xl bg-white/5 text-white/60 hover:bg-white/10 text-sm font-semibold transition-all border border-white/10">
             Show All ({fileKeys.length}) Images
           </button>
@@ -422,13 +446,13 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
         e.target.value = "";
       }} />
 
-      {fullscreenIdx !== null && (
+      {fullscreenIdx !== null && imageUrls[fullscreenIdx] && (
         <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center animate-fade-in" onClick={() => setFullscreenIdx(null)}>
           <button onClick={() => setFullscreenIdx(null)} className="absolute top-6 left-6 z-50 text-white/50 hover:text-white flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-md">
             <ArrowLeft className="w-5 h-5" /> Back
           </button>
-          <img src={getImageUrl(fileKeys[fullscreenIdx])} alt="" className="max-w-[95vw] max-h-[90vh] object-contain shadow-2xl" crossOrigin="anonymous" />
-          <div className="absolute bottom-6 bg-black/40 px-4 py-2 rounded-full text-white/60 text-xs backdrop-blur-md">{fullscreenIdx + 1} / {fileKeys.length}</div>
+          <img src={imageUrls[fullscreenIdx]} alt="" className="max-w-[95vw] max-h-[90vh] object-contain shadow-2xl" crossOrigin="anonymous" />
+          <div className="absolute bottom-6 bg-black/40 px-4 py-2 rounded-full text-white/60 text-xs backdrop-blur-md">{fullscreenIdx + 1} / {imageUrls.length}</div>
         </div>
       )}
     </div>
@@ -447,6 +471,7 @@ const MyVaults: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [pinVerifyVault, setPinVerifyVault] = useState<Vault | null>(null);
   const [imageEditVault, setImageEditVault] = useState<Vault | null>(null);
+  const [editPin, setEditPin] = useState<string>("");
 
   useEffect(() => {
     if (!userData?.uid) return;
@@ -518,8 +543,8 @@ const MyVaults: React.FC = () => {
         )}
 
         {editVault && <EditVaultModal vault={editVault} onClose={() => setEditVault(null)} />}
-        {pinVerifyVault && <PinVerifyModal vault={pinVerifyVault} onClose={() => setPinVerifyVault(null)} onSuccess={() => { setImageEditVault(pinVerifyVault); setPinVerifyVault(null); }} />}
-        {imageEditVault && <ImageEditMode vault={imageEditVault} onClose={() => setImageEditVault(null)} />}
+        {pinVerifyVault && <PinVerifyModal vault={pinVerifyVault} onClose={() => setPinVerifyVault(null)} onSuccess={(pin) => { setEditPin(pin); setImageEditVault(pinVerifyVault); setPinVerifyVault(null); }} />}
+        {imageEditVault && <ImageEditMode vault={imageEditVault} pin={editPin} onClose={() => { setImageEditVault(null); setEditPin(""); }} />}
       </div>
     </div>
   );
