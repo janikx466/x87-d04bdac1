@@ -9,6 +9,7 @@ import QRCodeCard from "@/components/QRCodeCard";
 import { toast } from "sonner";
 import { Eye, Clock, QrCode, EyeOff, Pause, Play, Timer, Trash2, Edit, Share2, X, Search, Copy, RefreshCw, ArrowLeft, ImagePlus, Loader2 } from "lucide-react";
 
+// Worker URL consistent with ViewVault logic
 const WORKER_URL = "https://secretgpv.janikamo465.workers.dev";
 
 interface Vault {
@@ -27,6 +28,7 @@ interface Vault {
   ownerId: string;
 }
 
+// Utility Helpers
 function getExpiryDate(expiry: any): Date | null {
   if (!expiry) return null;
   if (expiry.toDate) return expiry.toDate();
@@ -60,6 +62,8 @@ function useCountdown(target: Date | null) {
   }, [target]);
   return remaining;
 }
+
+// --- Components ---
 
 const VaultCard: React.FC<{ vault: Vault; onEdit: (vault: Vault) => void; onImageEdit: (vault: Vault) => void }> = ({ vault, onEdit, onImageEdit }) => {
   const [showPin, setShowPin] = useState(false);
@@ -97,7 +101,7 @@ const VaultCard: React.FC<{ vault: Vault; onEdit: (vault: Vault) => void; onImag
 
   return (
     <>
-      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 animate-fade-in">
+      <div className="p-4 rounded-2xl bg-white/5 border border-white/10 animate-fade-in hover:border-white/20 transition-all">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             {vault.shortCode && (
@@ -176,7 +180,6 @@ const VaultCard: React.FC<{ vault: Vault; onEdit: (vault: Vault) => void; onImag
   );
 };
 
-// Edit Modal with expiry editing
 const EditVaultModal: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault, onClose }) => {
   const [pin, setPin] = useState(vault.pin);
   const [viewLimit, setViewLimit] = useState(vault.viewLimit);
@@ -210,11 +213,11 @@ const EditVaultModal: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md p-6 rounded-2xl bg-[#1e293b] border border-white/10 text-white max-h-[90vh] overflow-y-auto">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md p-6 rounded-2xl bg-[#1e293b] border border-white/10 text-white max-h-[90vh] overflow-y-auto shadow-2xl">
         <h3 className="text-lg font-bold mb-4">Edit Vault: {vault.id}</h3>
         <div className="mb-3">
           <label className="text-xs text-white/50 mb-1 block">PIN</label>
-          <input type="text" value={pin} onChange={(e) => setPin(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none" />
+          <input type="text" value={pin} onChange={(e) => setPin(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-green-500/50" />
         </div>
         <div className="mb-3">
           <label className="text-xs text-white/50 mb-1 block">View Limit: {viewLimit}</label>
@@ -246,7 +249,7 @@ const EditVaultModal: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault
           </div>
         )}
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-xl bg-white/5 text-white/50 text-sm">Cancel</button>
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl bg-white/5 text-white/50 text-sm hover:bg-white/10">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 py-2 rounded-xl font-semibold text-white text-sm" style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
             {saving ? "Saving..." : "Save"}
           </button>
@@ -256,7 +259,6 @@ const EditVaultModal: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault
   );
 };
 
-// PIN verification for image edit
 const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: () => void; onClose: () => void }> = ({ vault, onClose, onSuccess }) => {
   const [pin, setPin] = useState("");
   const verify = () => {
@@ -264,10 +266,10 @@ const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: () => void; onClose: (
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xs p-6 rounded-2xl bg-[#1e293b] border border-white/10 text-white text-center">
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xs p-6 rounded-2xl bg-[#1e293b] border border-white/10 text-white text-center shadow-2xl">
         <h3 className="text-lg font-bold mb-4">Enter Vault PIN</h3>
         <input type="number" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="Enter PIN" maxLength={8}
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-center text-lg tracking-[0.3em] outline-none mb-4 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-center text-lg tracking-[0.3em] outline-none mb-4"
           onKeyDown={(e) => e.key === "Enter" && verify()} autoFocus />
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-2 rounded-xl bg-white/5 text-white/50 text-sm">Cancel</button>
@@ -278,9 +280,9 @@ const PinVerifyModal: React.FC<{ vault: Vault; onSuccess: () => void; onClose: (
   );
 };
 
-// Image Edit Mode
+// --- Image Edit Mode (Fixed Logic) ---
+
 const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault, onClose }) => {
-  const { userData } = useAuth();
   const [fileKeys, setFileKeys] = useState<string[]>(vault.fileKeys || []);
   const [showAll, setShowAll] = useState(false);
   const [replacingIdx, setReplacingIdx] = useState<number | null>(null);
@@ -290,12 +292,17 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
   const fileInputRef = useRef<HTMLInputElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  const BATCH_SIZE = 20;
-  const displayKeys = showAll ? fileKeys : fileKeys.slice(0, 3);
+  const displayKeys = showAll ? fileKeys : fileKeys.slice(0, 4);
 
-  const getImageUrl = (key: string) => `${WORKER_URL}?file=${encodeURIComponent(key)}`;
+  // URL Logic: Matching ViewVault style
+  const getImageUrl = (key: string) => {
+    if (!key) return "";
+    // If it's already a full URL
+    if (key.startsWith("http")) return key;
+    // Otherwise, Route through Worker to handle R2 fetch correctly
+    return `${WORKER_URL}?file=${encodeURIComponent(key)}`;
+  };
 
-  // Lazy loading via intersection observer
   const imageRef = useCallback((node: HTMLDivElement | null) => {
     if (!node) return;
     if (!observerRef.current) {
@@ -317,13 +324,12 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
       const oldKey = fileKeys[idx];
       const newKey = `vaults/${vault.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
       await uploadToR2(file, newKey);
-      // Try delete old from R2
       try { await deleteFromR2(oldKey); } catch {}
       const newKeys = [...fileKeys];
       newKeys[idx] = newKey;
       await updateDoc(doc(db, "vaults", vault.id), { fileKeys: newKeys });
       setFileKeys(newKeys);
-      toast.success("Image replaced successfully");
+      toast.success("Image replaced!");
     } catch (err: any) {
       toast.error(err.message || "Replace failed");
     } finally { setReplacingIdx(null); }
@@ -338,55 +344,62 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
       const newKeys = fileKeys.filter((_, i) => i !== idx);
       await updateDoc(doc(db, "vaults", vault.id), { fileKeys: newKeys });
       setFileKeys(newKeys);
-      toast.success("Image deleted successfully");
+      toast.success("Image deleted!");
     } catch (err: any) {
       toast.error(err.message || "Delete failed");
     } finally { setDeletingIdx(null); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-        <button onClick={onClose} className="text-white/50 hover:text-white flex items-center gap-2">
+    <div className="fixed inset-0 z-50 bg-[#0a0a0a] flex flex-col overflow-hidden animate-fade-in">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 bg-[#0f172a]">
+        <button onClick={onClose} className="text-white/50 hover:text-white flex items-center gap-2 text-sm font-medium">
           <ArrowLeft className="w-5 h-5" /> Back
         </button>
-        <span className="text-white font-semibold text-sm">Total: {fileKeys.length} Images</span>
-        <div className="w-16" />
+        <span className="text-white font-bold text-sm">{fileKeys.length} Photos</span>
+        <div className="w-10" />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="flex-1 overflow-y-auto p-4 bg-[#0f172a]">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {displayKeys.map((key, idx) => (
-            <div key={key + idx} ref={imageRef} data-idx={idx} className="relative group rounded-xl overflow-hidden bg-white/5 aspect-square">
-              {(loadedImages.has(idx) || idx < 6) ? (
-                <img src={getImageUrl(key)} alt={`Image ${idx + 1}`} className="w-full h-full object-cover cursor-pointer" onClick={() => setFullscreenIdx(idx)} loading="lazy" />
+            <div key={key + idx} ref={imageRef} data-idx={idx} className="relative group rounded-2xl overflow-hidden bg-white/5 aspect-square border border-white/5">
+              {(loadedImages.has(idx) || idx < 4) ? (
+                <img 
+                  src={getImageUrl(key)} 
+                  alt={`Image ${idx + 1}`} 
+                  className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105" 
+                  onClick={() => setFullscreenIdx(idx)} 
+                  loading="lazy"
+                  crossOrigin="anonymous" // Essential for CORS matching ViewVault
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 text-white/20 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-white/10 animate-spin" />
                 </div>
               )}
 
               {replacingIdx === idx && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
                   <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
                 </div>
               )}
               {deletingIdx === idx && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm">
                   <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
                 </div>
               )}
 
-              <div className="absolute bottom-0 left-0 right-0 p-2 flex gap-1 opacity-0 group-hover:opacity-100 transition bg-gradient-to-t from-black/80 to-transparent">
+              <div className="absolute bottom-0 left-0 right-0 p-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-gradient-to-t from-black/90 to-transparent">
                 <button
                   onClick={(e) => { e.stopPropagation(); fileInputRef.current?.setAttribute("data-replace-idx", String(idx)); fileInputRef.current?.click(); }}
-                  className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 rounded-lg bg-blue-500/30 text-blue-300 hover:bg-blue-500/50"
+                  className="flex-1 flex items-center justify-center gap-1 text-[10px] py-2 rounded-xl bg-blue-500/20 text-blue-300 hover:bg-blue-500/40 backdrop-blur-md"
                 >
                   <RefreshCw className="w-3 h-3" /> Replace
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(idx); }}
-                  className="flex-1 flex items-center justify-center gap-1 text-[10px] py-1.5 rounded-lg bg-red-500/30 text-red-300 hover:bg-red-500/50"
+                  className="flex-1 flex items-center justify-center gap-1 text-[10px] py-2 rounded-xl bg-red-500/20 text-red-300 hover:bg-red-500/40 backdrop-blur-md"
                 >
                   <Trash2 className="w-3 h-3" /> Delete
                 </button>
@@ -395,14 +408,13 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
           ))}
         </div>
 
-        {!showAll && fileKeys.length > 3 && (
-          <button onClick={() => setShowAll(true)} className="w-full mt-4 py-3 rounded-xl bg-white/5 text-white/60 hover:bg-white/10 text-sm font-medium transition">
-            + More ({fileKeys.length - 3} images)
+        {!showAll && fileKeys.length > 4 && (
+          <button onClick={() => setShowAll(true)} className="w-full mt-6 py-4 rounded-2xl bg-white/5 text-white/60 hover:bg-white/10 text-sm font-semibold transition-all border border-white/10">
+            Show All ({fileKeys.length}) Images
           </button>
         )}
       </div>
 
-      {/* Hidden file input */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
         const file = e.target.files?.[0];
         const idx = Number(fileInputRef.current?.getAttribute("data-replace-idx") || 0);
@@ -410,19 +422,20 @@ const ImageEditMode: React.FC<{ vault: Vault; onClose: () => void }> = ({ vault,
         e.target.value = "";
       }} />
 
-      {/* Fullscreen preview */}
       {fullscreenIdx !== null && (
-        <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center" onClick={() => setFullscreenIdx(null)}>
-          <button onClick={() => setFullscreenIdx(null)} className="absolute top-4 left-4 z-50 text-white/70 hover:text-white flex items-center gap-2">
-            <ArrowLeft className="w-6 h-6" /> Back
+        <div className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center animate-fade-in" onClick={() => setFullscreenIdx(null)}>
+          <button onClick={() => setFullscreenIdx(null)} className="absolute top-6 left-6 z-50 text-white/50 hover:text-white flex items-center gap-2 bg-white/10 px-4 py-2 rounded-full backdrop-blur-md">
+            <ArrowLeft className="w-5 h-5" /> Back
           </button>
-          <img src={getImageUrl(fileKeys[fullscreenIdx])} alt="" className="max-w-[95vw] max-h-[90vh] object-contain" />
-          <div className="absolute bottom-4 text-white/40 text-xs">{fullscreenIdx + 1} / {fileKeys.length}</div>
+          <img src={getImageUrl(fileKeys[fullscreenIdx])} alt="" className="max-w-[95vw] max-h-[90vh] object-contain shadow-2xl" crossOrigin="anonymous" />
+          <div className="absolute bottom-6 bg-black/40 px-4 py-2 rounded-full text-white/60 text-xs backdrop-blur-md">{fullscreenIdx + 1} / {fileKeys.length}</div>
         </div>
       )}
     </div>
   );
 };
+
+// --- Main Page ---
 
 const MyVaults: React.FC = () => {
   const { userData } = useAuth();
@@ -469,54 +482,43 @@ const MyVaults: React.FC = () => {
   const recentVaults = filtered.slice(0, 1);
   const displayVaults = tab === "recent" ? recentVaults : filtered;
 
-  const handleImageEditRequest = (vault: Vault) => {
-    setPinVerifyVault(vault);
-  };
-
-  const handlePinSuccess = () => {
-    if (pinVerifyVault) {
-      setImageEditVault(pinVerifyVault);
-      setPinVerifyVault(null);
-    }
-  };
-
   if (loading) return <OrbitalLoader />;
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white px-4 py-8">
       <div className="max-w-3xl mx-auto">
-        <Link to="/dashboard" className="text-white/50 hover:text-white text-sm">← Back Dashboard</Link>
-        <h1 className="text-2xl font-bold mt-4 mb-4">My Vaults</h1>
+        <Link to="/dashboard" className="text-white/50 hover:text-white text-sm transition-colors">← Back Dashboard</Link>
+        <h1 className="text-3xl font-bold mt-4 mb-4 tracking-tight">My Vaults</h1>
 
-        <div className="mb-4">
-          <p className="text-[10px] text-white/30 mb-1">Find Vault Instantly using Short Code</p>
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
-            <Search className="w-4 h-4 text-white/30" />
-            <span className="text-sm text-white/50 font-mono">SG-</span>
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="e.g. 7K2X" className="flex-1 bg-transparent text-white text-sm outline-none font-mono" maxLength={4} />
+        <div className="mb-6">
+          <p className="text-[10px] text-white/30 mb-2 uppercase tracking-widest font-semibold">Find Vault Instantly</p>
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 focus-within:border-green-500/50 transition-all">
+            <Search className="w-5 h-5 text-white/30" />
+            <span className="text-sm text-white/30 font-mono">SG-</span>
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="e.g. 7K2X" className="flex-1 bg-transparent text-white text-sm outline-none font-mono placeholder:text-white/10" maxLength={4} />
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6">
-          <button onClick={() => setTab("recent")} className={`px-4 py-2 rounded-xl text-sm font-medium transition ${tab === "recent" ? "bg-green-500 text-white" : "bg-white/5 text-white/60"}`}>Recent</button>
-          <button onClick={() => setTab("all")} className={`px-4 py-2 rounded-xl text-sm font-medium transition ${tab === "all" ? "bg-green-500 text-white" : "bg-white/5 text-white/60"}`}>All Vaults ({vaults.length})</button>
+        <div className="flex gap-2 mb-8 bg-white/5 p-1 rounded-2xl w-fit">
+          <button onClick={() => setTab("recent")} className={`px-6 py-2 rounded-xl text-sm font-semibold transition-all ${tab === "recent" ? "bg-green-500 text-white shadow-lg shadow-green-500/20" : "text-white/50 hover:text-white"}`}>Recent</button>
+          <button onClick={() => setTab("all")} className={`px-6 py-2 rounded-xl text-sm font-semibold transition-all ${tab === "all" ? "bg-green-500 text-white shadow-lg shadow-green-500/20" : "text-white/50 hover:text-white"}`}>All ({vaults.length})</button>
         </div>
 
-        {displayVaults.length === 0 && (
-          <div className="text-center py-20">
-            <p className="text-white/50">{debouncedSearch ? "No vault found for this code" : "No vaults yet."}</p>
-            {!debouncedSearch && <Link to="/create-vault" className="text-green-400 text-sm mt-2 inline-block">Create your first vault →</Link>}
+        {displayVaults.length === 0 ? (
+          <div className="text-center py-24 bg-white/5 rounded-3xl border border-dashed border-white/10">
+            <p className="text-white/40 mb-4">{debouncedSearch ? "No vault found for this code" : "Your vault collection is empty."}</p>
+            {!debouncedSearch && <Link to="/create-vault" className="inline-block px-6 py-2 rounded-xl bg-green-500 text-white text-sm font-bold">Create New Vault</Link>}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {displayVaults.map((v) => (
+              <VaultCard key={v.id} vault={v} onEdit={setEditVault} onImageEdit={(v) => setPinVerifyVault(v)} />
+            ))}
           </div>
         )}
 
-        <div className="space-y-4">
-          {displayVaults.map((v) => (
-            <VaultCard key={v.id} vault={v} onEdit={setEditVault} onImageEdit={handleImageEditRequest} />
-          ))}
-        </div>
-
         {editVault && <EditVaultModal vault={editVault} onClose={() => setEditVault(null)} />}
-        {pinVerifyVault && <PinVerifyModal vault={pinVerifyVault} onClose={() => setPinVerifyVault(null)} onSuccess={handlePinSuccess} />}
+        {pinVerifyVault && <PinVerifyModal vault={pinVerifyVault} onClose={() => setPinVerifyVault(null)} onSuccess={() => { setImageEditVault(pinVerifyVault); setPinVerifyVault(null); }} />}
         {imageEditVault && <ImageEditMode vault={imageEditVault} onClose={() => setImageEditVault(null)} />}
       </div>
     </div>
