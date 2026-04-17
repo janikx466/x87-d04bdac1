@@ -471,6 +471,7 @@ const MyVaults: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [pinVerifyVault, setPinVerifyVault] = useState<Vault | null>(null);
   const [imageEditVault, setImageEditVault] = useState<Vault | null>(null);
+  const [editPin, setEditPin] = useState<string>("");
 
   useEffect(() => {
     if (!userData?.uid) return;
